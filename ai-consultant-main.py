@@ -9,6 +9,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 import os
 import tempfile
+import speech_recognition as sr
+from PIL import Image
+from transformers import pipeline
 
 # ======= 🚀 Initial Configuration =======
 st.set_page_config(
@@ -30,10 +33,9 @@ if "memory" not in st.session_state:
     st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # ======= 📈 Financial Analysis Templates (Dynamic Prompting) =======
+system_template = """Anda adalah analis keuangan senior yang sangat terampil. Tugas Anda adalah menganalisis informasi keuangan yang diberikan, baik dari dokumen, teks, maupun gambar.
 
-system_template = """Anda adalah analis keuangan senior yang sangat terampil. Tugas Anda adalah menganalisis dokumen keuangan yang diberikan.
-
-Dokumen:
+Informasi:
 {context}
 
 Gunakan Bahasa Indonesia formal dan istilah keuangan yang tepat. Jawablah dengan ringkas dan jelas."""
@@ -49,8 +51,7 @@ messages = [
 ]
 prompt = PromptTemplate(input_variables=["context", "question", "format_instructions"], template=system_template + "\n\n" + user_template)
 
-
-# ======= 🛠️ Document Processing Engine =======
+# ======= 🛠️ Document Processing Engine (no changes) =======
 class FinancialDocumentProcessor:
     def __init__(self):
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -88,13 +89,43 @@ def init_models():
         "gpt-3.5-turbo": ChatOpenAI(temperature=0.3, model="gpt-3.5-turbo", api_key=openai_api_key, streaming=True)
     }
 
+# ======= 🎤 Speech-to-Text Function =======
+def transcribe_audio():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        st.toast("🎤 Silakan berbicara...")
+        audio = r.listen(source, timeout=10, phrase_time_limit=30)
+
+    try:
+        text = r.recognize_google(audio, language="id-ID")
+        st.toast("✅ Transkripsi selesai.")
+        return text
+    except sr.UnknownValueError:
+        st.error("⚠️ Maaf, tidak dapat mengenali suara.")
+        return None
+    except sr.RequestError as e:
+        st.error(f"⚠️ Error dengan layanan transkripsi: {e}")
+        return None
+
+# ======= 🖼️ Image Captioning Function (Hugging Face) =======
+image_captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
+
+def image_to_text(image_file):
+    try:
+        image = Image.open(image_file)
+        caption = image_captioner(image)[0]['generated_text']
+        return caption
+    except Exception as e:
+        st.error(f"Error processing image: {type(e).__name__}: {str(e)}")
+        return None
+
 # ======= 🧩 Main Application Logic =======
 def main():
     # Sidebar Configuration
     with st.sidebar:
         st.header("Configuration")
         model_name = st.selectbox("Select AI Model", ["gpt-4", "gpt-3.5-turbo"])
-        analysis_depth = st.slider("Analysis Depth", 1, 5, 3)  # Currently unused
+        analysis_depth = st.slider("Analysis Depth", 1, 5, 3)
         st.divider()
 
         if st.button("🧹 Clear Session"):
@@ -110,13 +141,22 @@ def main():
     st.title("📊 AI Financial Analyst Pro")
     st.caption("Enterprise-grade Financial Document Analysis System")
 
+    # --- File Upload ---
     uploaded_files = st.file_uploader(
         "📁 Upload Financial Documents (PDF/TXT)",
         type=["pdf", "txt"],
         accept_multiple_files=True
     )
 
-    # Document processing (no changes here)
+    # --- Image Upload ---
+    uploaded_image = st.file_uploader("🖼️ Upload Image (optional)", type=["jpg", "jpeg", "png"])
+    if uploaded_image:
+        st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
+        image_caption = image_to_text(uploaded_image)  # Generate caption
+    else:
+        image_caption = ""
+
+    # --- Document processing (no changes here) ---
     if uploaded_files and "retriever" not in st.session_state:
         with st.status("🔍 Analyzing Documents...", expanded=True) as status:
             all_docs = []
@@ -150,8 +190,23 @@ def main():
             else:
                 status.update(label="⚠️ No valid documents processed", state="error")
 
-    # Chat Interface
-    if prompt := st.chat_input("💬 Ask financial questions..."):
+    # --- Speech-to-Text ---
+    if st.button("🎤 Rekam Pertanyaan"):
+        transcribed_text = transcribe_audio()
+        if transcribed_text:
+            st.session_state.user_input = transcribed_text  # Simpan transkripsi
+            # st.experimental_rerun()  # Tidak perlu rerun di sini
+
+    # --- Chat Interface ---
+    # Gunakan st.session_state untuk input pengguna
+    if "user_input" not in st.session_state:
+        st.session_state.user_input = ""
+
+    # Tampilkan input dari transkripsi ATAU input teks
+    prompt = st.chat_input("💬 Ask financial questions...", value=st.session_state.user_input)
+
+    if prompt:  # Proses jika ada input (baik dari teks atau transkripsi)
+        st.session_state.user_input = prompt  # Update session state
         with st.chat_message("user"):
             st.markdown(prompt)
 
@@ -161,21 +216,18 @@ def main():
 
         retriever = st.session_state.retriever
 
-        # --- Dynamic Formatting Logic ---
+        # --- Dynamic Prompt ---
         format_instructions = ""
         if "analisis risiko" in prompt.lower():
             format_instructions += "Risk Analysis: (analisis risiko secara mendalam)\n"
         if "rekomendasi" in prompt.lower():
             format_instructions += "Recommendations: (rekomendasi yang actionable dan spesifik)\n"
-
         if not format_instructions:
             format_instructions = """
             Executive Summary: (maksimal 3 kalimat)
             Key Metrics: (dalam format tabel)
             """
-        # --- End Dynamic Logic ---
 
-        # ********** KUNCI PERBAIKAN DI SINI **********
         custom_prompt = prompt.partial(format_instructions=format_instructions)
 
         qa_chain = ConversationalRetrievalChain.from_llm(
@@ -183,26 +235,27 @@ def main():
             retriever=retriever,
             memory=st.session_state.memory,
             verbose=True,
-            return_source_documents=True,  # Optional, but useful
-            combine_docs_chain_kwargs={"prompt": custom_prompt}  # Use the *partial* prompt
+            return_source_documents=True,
+            combine_docs_chain_kwargs={"prompt": custom_prompt}
         )
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    # Hanya berikan 'question'. LangChain akan urus sisanya.
-                    result = qa_chain.invoke({"question": prompt})
+                    # Gabungkan input teks, transkripsi, dan caption gambar
+                    full_input = prompt
+                    if image_caption:
+                        full_input += "\n\nImage Caption: " + image_caption
+                    result = qa_chain.invoke({"question": full_input})
                     response = result["answer"]
 
-                    # --- Post-processing (no changes here) ---
+                    # --- Post-processing (same as before) ---
                     parts = {}
-
                     if "Executive Summary" in response:
                         try:
                             parts["Executive Summary"] = response.split("Executive Summary")[1].split("Key Metrics")[0].strip()
                         except:
                             pass
-
                     if "Key Metrics" in response:
                         try:
                             table_str = response.split("Key Metrics")[1].split("Risk Analysis")[0].split("Recommendations")[0].strip()
@@ -250,6 +303,13 @@ def main():
 
                 except Exception as e:
                     st.error(f"⚠️ AI Response Error: {type(e).__name__}: {str(e)}")
+
+    # Bersihkan input jika tombol Clear Session ditekan
+    if st.session_state.get('clear_session_button'):
+      st.session_state.user_input = ""
+      st.session_state.clear()  # Bersihkan semua session state
+      st.cache_resource.clear()
+      st.rerun()
 
 # ======= 🚨 Error Handling & Safety =======
 if __name__ == "__main__":
