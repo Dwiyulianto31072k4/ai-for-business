@@ -218,12 +218,12 @@ def init_chain(retriever):
     Jika jawaban tidak ditemukan dalam informasi yang tersedia, katakan dengan jujur bahwa
     kamu tidak dapat menjawab berdasarkan dokumen yang diunggah.
     """
-    
+
     prompt = PromptTemplate(
         input_variables=["context", "chat_history", "question"],
         template=template
     )
-    
+
     try:
         chain = ConversationalRetrievalChain.from_llm(
             llm=st.session_state.llm,
@@ -231,15 +231,17 @@ def init_chain(retriever):
             memory=st.session_state.memory,
             combine_docs_chain_kwargs={"prompt": prompt},
             return_source_documents=True,
-            output_key="answer"  # Tentukan output yang ingin disimpan
+            output_key="answer"  # ✅ Tambahkan ini agar hanya menyimpan 'answer'
         )
-        
+
         return chain
-        
+
     except Exception as e:
         logger.error(f"Error inisialisasi chain: {str(e)}")
         st.error(f"❌ Gagal menginisialisasi chain: {str(e)}")
         return None
+
+
 
 def process_query(chain, query):
     """Memproses kueri dan menangani output."""
