@@ -584,11 +584,11 @@ with tab1:
     
     # Tampilkan chat history
     with chat_container:
-        for i, (role, message) in enumerate(st.session_state.history):
-            message_key = f"{role}_{i}"
-            with st.chat_message(role, key=message_key):
-                st.markdown(message)
-    
+    for i, (role, message) in enumerate(st.session_state.history):
+        # Gunakan st.chat_message tanpa key
+        with st.chat_message(role):
+            st.markdown(message)
+
     # Disable chat input jika API key tidak tersedia
     if not st.session_state.api_key:
         st.warning("⚠️ Silakan masukkan API Key OpenAI di sidebar untuk memulai chat.")
