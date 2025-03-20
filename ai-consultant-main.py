@@ -189,9 +189,6 @@ with st.chat_message("assistant"):
         
     except Exception as e:
         st.error(f"⚠️ AI Response Error: {str(e)}")
-Penjelasan perbaikan kode:
-
-
 
 # ======= 🚨 Error Handling & Safety =======
 if __name__ == "__main__":
