@@ -199,9 +199,9 @@ def process_file(uploaded_file, chunk_size=500, chunk_overlap=50):
         return None
 
 # ======= 🔄 Inisialisasi Chain =======
+
 def init_chain(retriever):
     """Inisialisasi ConversationalRetrievalChain"""
-    # Template prompt kustom
     template = """
     Kamu adalah AI Business Consultant yang profesional dan membantu.
     
@@ -214,7 +214,7 @@ def init_chain(retriever):
     Pertanyaan Pengguna: {question}
     
     Berikan jawaban yang komprehensif, akurat, dan bermanfaat berdasarkan informasi yang diberikan.
-    Jika jawaban tidak ditemukan dalam informasi yang tersedia, katakan dengan jujur bahwa 
+    Jika jawaban tidak ditemukan dalam informasi yang tersedia, katakan dengan jujur bahwa
     kamu tidak dapat menjawab berdasarkan dokumen yang diunggah.
     """
     
@@ -225,20 +225,32 @@ def init_chain(retriever):
     
     try:
         chain = ConversationalRetrievalChain.from_llm(
-    llm=st.session_state.llm,
-    retriever=retriever,
-    memory=st.session_state.memory,
-    combine_docs_chain_kwargs={"prompt": prompt},
-    return_source_documents=True,
-    output_key="answer"  # Tentukan output yang ingin disimpan
+            llm=st.session_state.llm,
+            retriever=retriever,
+            memory=st.session_state.memory,
+            combine_docs_chain_kwargs={"prompt": prompt},
+            return_source_documents=True,
+            output_key="answer"  # Tentukan output yang ingin disimpan
         )
         
         return chain
+        
     except Exception as e:
         logger.error(f"Error inisialisasi chain: {str(e)}")
         st.error(f"❌ Gagal menginisialisasi chain: {str(e)}")
         return None
 
+def process_query(chain, query):
+    """Memproses kueri dan menangani output."""
+    result = chain({"question": query})
+    answer = result["answer"]
+    source_docs = result["source_documents"]
+
+    # Simpan source_docs di session state untuk digunakan nanti
+    st.session_state.source_docs = source_docs
+
+    return answer
+ 
 # ======= 🔍 Proses Internet Search =======
 def search_internet(query):
     """Simulasi pencarian internet (implementasi sebenarnya membutuhkan API)"""
