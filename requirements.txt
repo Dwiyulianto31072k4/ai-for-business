@@ -1,0 +1,12 @@
+streamlit
+openai
+langchain
+langchain_openai
+langchain_community
+faiss-cpu
+tiktoken
+beautifulsoup4
+requests
+PyMuPDF
+pydantic
+pypdf
