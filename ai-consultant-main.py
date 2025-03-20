@@ -9,7 +9,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 import os
 import tempfile
-import re  # Used for minor formatting – consider removing if truly unnecessary
 
 # ======= 🚀 Initial Configuration =======
 st.set_page_config(
@@ -178,18 +177,20 @@ def main():
 
         # --- End Dynamic Logic ---
 
+        # Perhatikan perubahan di sini:
         qa_chain = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=retriever,
             memory=st.session_state.memory,
             verbose=True,
-            combine_docs_chain_kwargs={"prompt": prompt}
+            # combine_docs_chain_kwargs={"prompt": prompt}  <-- HAPUS INI
         )
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
               try:
-                    result = qa_chain.invoke({"question": prompt, "format_instructions": format_instructions})
+                    # Perhatikan perubahan di sini juga:
+                    result = qa_chain.invoke({"question": prompt, "format_instructions": format_instructions, "context": ""}) #context dikosongkan, karena sudah di handle oleh retriever
                     response = result["answer"]
 
 
@@ -247,9 +248,6 @@ def main():
                     # Fallback: Display entire response if nothing was extracted
                     if not parts:
                         st.markdown(response)
-
-
-
 
               except Exception as e:
                     st.error(f"⚠️ AI Response Error: {type(e).__name__}: {str(e)}")
