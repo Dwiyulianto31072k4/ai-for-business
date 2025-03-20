@@ -583,19 +583,18 @@ with tab1:
     chat_container = st.container()
     
     # Tampilkan chat history
-    # Tampilkan chat history
-    with chat_container:
+with chat_container:
     for i, (role, message) in enumerate(st.session_state.history):
         # Gunakan st.chat_message tanpa key
         with st.chat_message(role):
             st.markdown(message)
-
-    # Disable chat input jika API key tidak tersedia
-    if not st.session_state.api_key:
-        st.warning("⚠️ Silakan masukkan API Key OpenAI di sidebar untuk memulai chat.")
-        chat_input_disabled = True
-    else:
-        chat_input_disabled = False
+            
+# Disable chat input jika API key tidak tersedia
+if not st.session_state.api_key:
+    st.warning("⚠️ Silakan masukkan API Key OpenAI di sidebar untuk memulai chat.")
+    chat_input_disabled = True
+else:
+    chat_input_disabled = False
     
     # Chat input
     user_input = st.chat_input("✏️ Ketik pesan atau pertanyaan Anda...", disabled=chat_input_disabled)
