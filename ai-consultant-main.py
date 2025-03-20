@@ -130,7 +130,7 @@ def reset_chat():
     st.session_state.history = []
     st.success("💡 Chat telah direset!")
 
-st.sidebar.button("🔄 Reset Chat", on_click=reset_chat)
+st.sidebar.button("🔄 Reset Chat Kamu!", on_click=reset_chat)
 
 # ======= 🎨 UI CUSTOM =======
 st.markdown("""
