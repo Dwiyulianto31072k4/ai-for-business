@@ -437,13 +437,12 @@ with tab1:
                     response = search_internet(user_input)
                 
                 # Jika ada file yang diproses, gunakan ConversationalRetrievalChain
-          
-elif st.session_state.file_processed and st.session_state.conversation:
-    with get_openai_callback() as cb:
+          elif st.session_state.file_processed and st.session_state.conversation:
+          with get_openai_callback() as cb:
         result = st.session_state.conversation.invoke({
             "question": user_input
         })
-        
+              
         response = result["answer"]
         
         # Update token usage
