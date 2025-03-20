@@ -116,7 +116,7 @@ def main():
         accept_multiple_files=True
     )
 
-    # Document processing (same as before)
+    # Document processing (no changes here)
     if uploaded_files and "retriever" not in st.session_state:
         with st.status("🔍 Analyzing Documents...", expanded=True) as status:
             all_docs = []
@@ -175,8 +175,7 @@ def main():
             """
         # --- End Dynamic Logic ---
 
-
-        # ********** PERUBAHAN PENTING DI SINI **********
+        # ********** KUNCI PERBAIKAN DI SINI **********
         custom_prompt = prompt.partial(format_instructions=format_instructions)
 
         qa_chain = ConversationalRetrievalChain.from_llm(
@@ -184,17 +183,18 @@ def main():
             retriever=retriever,
             memory=st.session_state.memory,
             verbose=True,
-            return_source_documents=True,
-            combine_docs_chain_kwargs={"prompt": custom_prompt}  # Gunakan prompt yang sudah di-partial
+            return_source_documents=True,  # Optional, but useful
+            combine_docs_chain_kwargs={"prompt": custom_prompt}  # Use the *partial* prompt
         )
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-              try:
-                    result = qa_chain.invoke({"question": prompt})  # Cukup berikan pertanyaan
+                try:
+                    # Hanya berikan 'question'. LangChain akan urus sisanya.
+                    result = qa_chain.invoke({"question": prompt})
                     response = result["answer"]
 
-                    # --- Post-processing (same as before) ---
+                    # --- Post-processing (no changes here) ---
                     parts = {}
 
                     if "Executive Summary" in response:
@@ -214,13 +214,12 @@ def main():
                             else:
                                 parts["Key Metrics"] = table_str
                         except Exception as e:
-                          parts["Key Metrics"] = table_str
-
+                            parts["Key Metrics"] = table_str
 
                     if "Risk Analysis" in response:
-                         parts["Risk Analysis"] = response.split("Risk Analysis")[1].split("Recommendations")[0].strip()
+                        parts["Risk Analysis"] = response.split("Risk Analysis")[1].split("Recommendations")[0].strip()
                     if "Recommendations" in response:
-                         parts["Recommendations"] = response.split("Recommendations")[1].strip()
+                        parts["Recommendations"] = response.split("Recommendations")[1].strip()
 
                     if "Executive Summary" in parts:
                         st.markdown(parts["Executive Summary"])
@@ -249,7 +248,7 @@ def main():
                                 st.write(doc.metadata)
                                 st.write("---")
 
-              except Exception as e:
+                except Exception as e:
                     st.error(f"⚠️ AI Response Error: {type(e).__name__}: {str(e)}")
 
 # ======= 🚨 Error Handling & Safety =======
