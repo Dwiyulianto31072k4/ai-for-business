@@ -9,7 +9,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 import os
 import tempfile
-import speech_recognition as sr
+#import speech_recognition as sr # Removed
 from PIL import Image
 from transformers import pipeline
 
@@ -54,7 +54,7 @@ messages = [
 prompt = PromptTemplate(input_variables=["context", "question", "format_instructions"], template=system_template + "\n\n" + user_template)
 
 
-# ======= 🛠️ Document Processing Engine (no changes) =======
+# ======= 🛠️ Document Processing Engine =======
 class FinancialDocumentProcessor:
     def __init__(self):
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -93,22 +93,7 @@ def init_models():
     }
 
 # ======= 🎤 Speech-to-Text Function =======
-def transcribe_audio():
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.toast("🎤 Silakan berbicara...")
-        audio = r.listen(source, timeout=10, phrase_time_limit=30)
-
-    try:
-        text = r.recognize_google(audio, language="id-ID")
-        st.toast("✅ Transkripsi selesai.")
-        return text
-    except sr.UnknownValueError:
-        st.error("⚠️ Maaf, tidak dapat mengenali suara.")
-        return None
-    except sr.RequestError as e:
-        st.error(f"⚠️ Error dengan layanan transkripsi: {e}")
-        return None
+# REMOVED transcribe_audio function
 
 # ======= 🖼️ Image Captioning Function (Hugging Face) =======
 # Moved initialization to main block
@@ -204,10 +189,7 @@ def main():
 
 
     # --- Speech-to-Text ---
-    if st.button("🎤 Rekam Pertanyaan"):
-        transcribed_text = transcribe_audio()
-        if transcribed_text:
-            st.session_state.user_input = transcribed_text  # Store transcription
+    # REMOVED Speech-to-text section
 
     # --- Chat Interface ---
     # Use st.session_state for user input (initialize if it doesn't exist)
@@ -215,7 +197,7 @@ def main():
         st.session_state.user_input = ""
 
     # st.chat_input *returns* the user's input.  It doesn't take a 'value' argument.
-    prompt_text = st.chat_input("💬 Ask financial questions...", placeholder="Type here or use the microphone...")
+    prompt_text = st.chat_input("💬 Ask financial questions...", placeholder="Type here...")
 
     if prompt_text:
         st.session_state.user_input = prompt_text  # Update session state with the entered text
