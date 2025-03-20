@@ -2,6 +2,7 @@ import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationTokenBufferMemory
 from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import SimpleMemory
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, CSVLoader
