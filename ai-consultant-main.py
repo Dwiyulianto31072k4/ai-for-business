@@ -437,30 +437,31 @@ with tab1:
                     response = search_internet(user_input)
                 
                 # Jika ada file yang diproses, gunakan ConversationalRetrievalChain
-                elif st.session_state.file_processed and st.session_state.conversation:
-                    with get_openai_callback() as cb:
-                        result = st.session_state.conversation.invoke({
-                            "question": user_input
-                        })
-                        
-                        response = result["answer"]
-                        
-                        # Update token usage
-                        st.session_state.token_usage["prompt_tokens"] += cb.prompt_tokens
-                        st.session_state.token_usage["completion_tokens"] += cb.completion_tokens
-                        st.session_state.token_usage["total_tokens"] += cb.total_tokens
-                        
-                        # Tambahkan informasi sumber
-                        if "source_documents" in result and result["source_documents"]:
-                            sources = set()
-                            for doc in result["source_documents"]:
-                                if hasattr(doc, "metadata") and "source" in doc.metadata:
-                                    sources.add(doc.metadata["source"])
-                            
-                            if sources:
-                                response += "\n\n**Sumber:**\n"
-                                for source in sources:
-                                    response += f"- {source}\n"
+          
+elif st.session_state.file_processed and st.session_state.conversation:
+    with get_openai_callback() as cb:
+        result = st.session_state.conversation.invoke({
+            "question": user_input
+        })
+        
+        response = result["answer"]
+        
+        # Update token usage
+        st.session_state.token_usage["prompt_tokens"] += cb.prompt_tokens
+        st.session_state.token_usage["completion_tokens"] += cb.completion_tokens
+        st.session_state.token_usage["total_tokens"] += cb.total_tokens
+        
+        # Tambahkan informasi sumber
+        if "source_documents" in result and result["source_documents"]:
+            sources = set()
+            for doc in result["source_documents"]:
+                if hasattr(doc, "metadata") and "source" in doc.metadata:
+                    sources.add(doc.metadata["source"])
+            
+            if sources:
+                response += "\n\n**Sumber:**\n"
+                for source in sources:
+                    response += f"- {source}\n"
                 
                 # Jika tidak ada file, gunakan LLM langsung
                 else:
