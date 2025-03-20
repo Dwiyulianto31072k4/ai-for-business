@@ -286,7 +286,7 @@ initialize_app()
 
 # ======= 📊 Sidebar =======
 with st.sidebar:
-    st.image("https://iconscout.com/3d-illustration/financial-consultant-6853608_5625723", width=100)
+    st.image("https://www.provincial.com/content/dam/public-web/global/images/micro-illustrations/bbva_manager_man_2.im1705594061549im.png?imwidth=320", width=100)
     st.title("💼 AI Business Consultant")
     
     # Load API Key
