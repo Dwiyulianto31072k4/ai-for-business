@@ -177,22 +177,21 @@ def main():
 
         # --- End Dynamic Logic ---
 
-        # Perhatikan perubahan di sini:
         qa_chain = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=retriever,
             memory=st.session_state.memory,
             verbose=True,
-            # combine_docs_chain_kwargs={"prompt": prompt}  <-- HAPUS INI
+            return_source_documents=True, # Tambahkan ini jika ingin melihat dokumen sumber
+            combine_docs_chain_kwargs={"prompt": prompt.partial(format_instructions=format_instructions)} # Perubahan sangat penting
         )
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
               try:
-                    # Perhatikan perubahan di sini juga:
-                    result = qa_chain.invoke({"question": prompt, "format_instructions": format_instructions, "context": ""}) #context dikosongkan, karena sudah di handle oleh retriever
+                    # HANYA berikan pertanyaan.  LangChain akan mengurus sisanya.
+                    result = qa_chain.invoke({"question": prompt})
                     response = result["answer"]
-
 
                     # --- Improved Post-processing ---
                     parts = {}  # Dictionary to store extracted parts
@@ -248,6 +247,17 @@ def main():
                     # Fallback: Display entire response if nothing was extracted
                     if not parts:
                         st.markdown(response)
+
+
+                    # Tampilkan dokumen sumber (jika return_source_documents=True)
+                    if 'source_documents' in result:
+                        with st.expander("Source Documents"):
+                            for doc in result['source_documents']:
+                                st.write(doc.page_content)
+                                st.write(doc.metadata) # Tampilkan metadata (nama file, dll.)
+                                st.write("---")
+
+
 
               except Exception as e:
                     st.error(f"⚠️ AI Response Error: {type(e).__name__}: {str(e)}")
