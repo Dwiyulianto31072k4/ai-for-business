@@ -5,120 +5,189 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.prompts import PromptTemplate
 import os
+import tempfile
+import re
 
-# ======= 🚀 Konfigurasi Streamlit =======
-st.set_page_config(page_title="AI Business Consultant", layout="wide")
+# ======= 🚀 Initial Configuration =======
+st.set_page_config(
+    page_title="AI Financial Analyst Pro",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# ======= 🚀 Load API Key dari Streamlit Secrets =======
+# ======= 🔐 Security & Authentication =======
 if "OPENAI_API_KEY" not in st.secrets:
-    st.error("❌ API Key OpenAI tidak ditemukan! Tambahkan di Streamlit Cloud.")
+    st.error("🔒 API Key not found! Configure in Streamlit Secrets.")
     st.stop()
 
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 
-# ======= 💾 Simpan history chat di session_state =======
-if "history" not in st.session_state:
-    st.session_state.history = []
+# ======= 🧠 Advanced Memory Management =======
+class EnhancedConversationMemory:
+    def __init__(self):
+        self.history = []
+        self.context_memory = []
+        
+    def add_context(self, context):
+        self.context_memory.append(context)
+        
+    def get_relevant_context(self, query):
+        return "\n".join([c for c in self.context_memory if query.lower() in c.lower()][-3:])
 
-# ======= 🔹 Pilihan Model OpenAI =======
-model_name = st.sidebar.selectbox("Pilih Model OpenAI:", ["gpt-4", "gpt-3.5-turbo"])
-llm = ChatOpenAI(api_key=openai_api_key, model=model_name)
+if "memory" not in st.session_state:
+    st.session_state.memory = EnhancedConversationMemory()
 
-# ======= 📌 Inisialisasi Memory untuk Chat History =======
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+# ======= 📈 Financial Analysis Templates =======
+FINANCIAL_ANALYSIS_PROMPT = """Anda adalah analis keuangan senior. Analisis dokumen berikut:
 
-# ======= 🔹 Pilihan Mode Chat atau Upload File =======
-mode = st.radio("📌 Pilih Mode Interaksi:", ["Chat", "Upload File"], horizontal=True)
+{docs}
 
-retriever = None  # Placeholder untuk retriever
+Pertanyaan: {question}
 
-if mode == "Upload File":
-    uploaded_files = st.file_uploader("📎 Unggah file (PDF, TXT)", type=["pdf", "txt"], accept_multiple_files=True)
+Format jawaban:
+1. **Executive Summary** (maks 3 kalimat)
+2. **Key Metrics** (format tabel)
+3. **Risk Analysis**
+4. **Recommendations**
+
+Gunakan Bahasa Indonesia formal dan istilah keuangan yang tepat."""
+
+# ======= 🛠️ Document Processing Engine =======
+class FinancialDocumentProcessor:
+    def __init__(self):
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=2000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", " ", ""]
+        )
+        
+    def process_file(self, file_path, file_type):
+        try:
+            if file_type == "application/pdf":
+                loader = PyPDFLoader(file_path)
+            elif file_type == "text/plain":
+                loader = TextLoader(file_path)
+            else:
+                raise ValueError("Unsupported file type")
+                
+            documents = loader.load()
+            return self.text_splitter.split_documents(documents)
+        except Exception as e:
+            st.error(f"⚠️ Document processing error: {str(e)}")
+            return None
+
+# ======= 🤖 AI Model Initialization =======
+def init_models():
+    return {
+        "gpt-4": ChatOpenAI(temperature=0.2, model="gpt-4", api_key=openai_api_key),
+        "gpt-3.5-turbo": ChatOpenAI(temperature=0.3, model="gpt-3.5-turbo", api_key=openai_api_key)
+    }
+
+# ======= 🧩 Main Application Logic =======
+def main():
+    # Sidebar Configuration
+    with st.sidebar:
+        st.header("Configuration")
+        model_name = st.selectbox("Select AI Model", ["gpt-4", "gpt-3.5-turbo"])
+        analysis_depth = st.slider("Analysis Depth", 1, 5, 3)
+        st.divider()
+        
+        if st.button("🧹 Clear Session"):
+            st.session_state.clear()
+            st.rerun()
+
+    # Initialize Core Components
+    models = init_models()
+    llm = models[model_name]
+    processor = FinancialDocumentProcessor()
+    
+    # Main Interface
+    st.title("📊 AI Financial Analyst Pro")
+    st.caption("Enterprise-grade Financial Document Analysis System")
+
+    # File Upload Section
+    uploaded_files = st.file_uploader(
+        "📁 Upload Financial Documents (PDF/TXT)",
+        type=["pdf", "txt"],
+        accept_multiple_files=True
+    )
+    
+    # Document Processing
+    retriever = None
     if uploaded_files:
-        all_docs = []
-        for uploaded_file in uploaded_files:
-            with st.spinner(f"📖 Memproses {uploaded_file.name}..."):
-                file_path = f"./temp_{uploaded_file.name}"
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
+        with st.status("🔍 Analyzing Documents...", expanded=True) as status:
+            all_docs = []
+            for uploaded_file in uploaded_files:
+                try:
+                    st.write(f"Processing {uploaded_file.name}...")
+                    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                        temp_file.write(uploaded_file.getvalue())
+                        temp_path = temp_file.name
+                    
+                    split_docs = processor.process_file(temp_path, uploaded_file.type)
+                    if split_docs:
+                        all_docs.extend(split_docs)
+                        st.session_state.memory.add_context(
+                            f"Document Processed: {uploaded_file.name}"
+                        )
+                    
+                    os.unlink(temp_path)
+                except Exception as e:
+                    st.error(f"Error processing {uploaded_file.name}: {str(e)}")
+            
+            if all_docs:
+                with st.spinner("🧠 Building Knowledge Base..."):
+                    vectorstore = FAISS.from_documents(all_docs, OpenAIEmbeddings())
+                    retriever = vectorstore.as_retriever(
+                        search_type="mmr",
+                        search_kwargs={"k": 5, "fetch_k": 20}
+                    )
+                status.update(label="✅ Analysis Complete", state="complete")
+            else:
+                st.error("⚠️ No valid documents processed")
 
-                # Load file sesuai jenisnya
-                if uploaded_file.type == "application/pdf":
-                    loader = PyPDFLoader(file_path)
-                elif uploaded_file.type == "text/plain":
-                    loader = TextLoader(file_path)
+    # Chat Interface
+    if prompt := st.chat_input("💬 Ask financial questions..."):
+        # Display User Message
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-                # Proses teks dan simpan ke retriever
-                documents = loader.load()
-                text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=100)
-                split_docs = text_splitter.split_documents(documents)
-                all_docs.extend(split_docs)
+        # Prepare Context
+        context = ""
+        if retriever:
+            docs = retriever.get_relevant_documents(prompt)
+            context = "\n\n".join([d.page_content for d in docs][:5])
+        
+        # Enhanced Prompt Engineering
+        custom_prompt = PromptTemplate.from_template(FINANCIAL_ANALYSIS_PROMPT)
+        formatted_prompt = custom_prompt.format(
+            docs=context,
+            question=prompt
+        )
 
-                # Hapus file sementara
-                os.remove(file_path)
+        # Generate Response
+        with st.chat_message("assistant"):
+            try:
+                response = llm.invoke(formatted_prompt)
+                content = response.content
+                
+                # Enhanced Formatting
+                content = re.sub(r"\*\*(.*?)\*\*", r"**\1**", content)  # Bold formatting
+                content = re.sub(r"(\d+\.)\s", r"\n\\1 ", content)       # List formatting
+                
+                st.markdown(content)
+                st.session_state.memory.add_context(f"Q: {prompt}\nA: {content}")
+            except Exception as e:
+                st.error(f"⚠️ AI Response Error: {str(e)}")
 
-        retriever = FAISS.from_documents(all_docs, OpenAIEmbeddings()).as_retriever()
-        st.success("✅ File berhasil diunggah dan diproses!")
-
-# ======= 🔹 Chatbot dengan Memory & Knowledge dari File (Jika Ada) =======
-conversation = ConversationalRetrievalChain.from_llm(
-    llm, retriever=retriever, memory=memory
-) if retriever else None
-
-# ======= 💬 Tampilkan History Chat =======
-st.markdown("## 💬 AI Business Consultant")
-for role, text in st.session_state.history:
-    with st.chat_message(role):
-        st.write(text)
-
-# ======= 🔹 Input Chat =======
-user_input = st.chat_input("✏️ Ketik pesan Anda...")
-
-if user_input and user_input.strip():
-    # Simpan pertanyaan user ke chat history
-    st.session_state.history.append(("user", user_input))
-
-    with st.chat_message("user"):
-        st.write(user_input)
-
-    # ======= 🔥 LOGIKA PERBAIKAN MEMORY =======
-    if retriever:
-        try:
-            response_data = conversation.invoke({"question": user_input})
-            response = response_data.get("answer", "⚠️ Tidak ada jawaban yang tersedia.")
-        except Exception as e:
-            response = f"⚠️ Terjadi kesalahan dalam pemrosesan file: {str(e)}"
-    else:
-        try:
-            response_data = llm.invoke(user_input)
-            response = response_data.content if hasattr(response_data, "content") else str(response_data)
-        except Exception as e:
-            response = f"⚠️ Terjadi kesalahan dalam memproses pertanyaan: {str(e)}"
-
-    # Simpan respons chatbot ke chat history
-    st.session_state.history.append(("assistant", response))
-
-    # ✅ Tampilkan respons chatbot di UI
-    with st.chat_message("assistant"):
-        st.write(response)
-
-# ======= 🛠️ Fungsi Reset Chat =======
-def reset_chat():
-    st.session_state.history = []
-    memory.clear()
-    st.success("💡 Chat telah direset!")
-
-st.sidebar.button("🔄 Reset Chat", on_click=reset_chat)
-
-# ======= 🎨 UI CUSTOM =======
-st.markdown("""
-<style>
-    .stChatMessage { border-radius: 8px; padding: 10px; margin: 5px; }
-    .stChatMessage-user { background-color: #DCF8C6; color: black; text-align: right; }
-    .stChatMessage-assistant { background-color: #ECECEC; color: black; text-align: left; }
-    .stChatInput { border-radius: 20px; border: 1px solid #ccc; padding: 10px; width: 100%; background-color: #FAFAFA; }
-    .stFileUploader { border: 2px dashed #ccc; border-radius: 10px; padding: 15px; text-align: center; font-size: 14px; color: #555; }
-</style>
-""", unsafe_allow_html=True)
+# ======= 🚨 Error Handling & Safety =======
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        st.error(f"🚨 Critical System Error: {str(e)}")
+        st.error("Please refresh the browser and try again")
