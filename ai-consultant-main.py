@@ -620,7 +620,7 @@ with tab1:
 
 # ======= 🎨 Custom CSS =======
 
-
+# ======= 🎨 Custom CSS =======
 st.markdown("""
 <style>
     /* Gaya umum */
@@ -681,5 +681,7 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(66, 133, 244, 0.3) !important;
     }
 </style>
-""")
+""", unsafe_allow_html=True)
+
+
 
