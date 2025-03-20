@@ -94,7 +94,7 @@ def main():
     with st.sidebar:
         st.header("Configuration")
         model_name = st.selectbox("Select AI Model", ["gpt-4", "gpt-3.5-turbo"])
-        analysis_depth = st.slider("Analysis Depth", 1, 5, 3)  # Currently unused, but good for future features
+        analysis_depth = st.slider("Analysis Depth", 1, 5, 3)  # Currently unused
         st.divider()
 
         if st.button("🧹 Clear Session"):
@@ -116,7 +116,7 @@ def main():
         accept_multiple_files=True
     )
 
-    # Document Processing and Retriever (only if not already in session_state)
+    # Document processing (same as before)
     if uploaded_files and "retriever" not in st.session_state:
         with st.status("🔍 Analyzing Documents...", expanded=True) as status:
             all_docs = []
@@ -150,7 +150,6 @@ def main():
             else:
                 status.update(label="⚠️ No valid documents processed", state="error")
 
-
     # Chat Interface
     if prompt := st.chat_input("💬 Ask financial questions..."):
         with st.chat_message("user"):
@@ -165,45 +164,45 @@ def main():
         # --- Dynamic Formatting Logic ---
         format_instructions = ""
         if "analisis risiko" in prompt.lower():
-            format_instructions += "Risk Analysis: (analisis risiko secara mendalam)\n"  # No numbering
+            format_instructions += "Risk Analysis: (analisis risiko secara mendalam)\n"
         if "rekomendasi" in prompt.lower():
-            format_instructions += "Recommendations: (rekomendasi yang actionable dan spesifik)\n"  # No numbering
+            format_instructions += "Recommendations: (rekomendasi yang actionable dan spesifik)\n"
 
-        if not format_instructions:  # Default format if no keywords
+        if not format_instructions:
             format_instructions = """
             Executive Summary: (maksimal 3 kalimat)
             Key Metrics: (dalam format tabel)
             """
-
         # --- End Dynamic Logic ---
+
+
+        # ********** PERUBAHAN PENTING DI SINI **********
+        custom_prompt = prompt.partial(format_instructions=format_instructions)
 
         qa_chain = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=retriever,
             memory=st.session_state.memory,
             verbose=True,
-            return_source_documents=True, # Tambahkan ini jika ingin melihat dokumen sumber
-            combine_docs_chain_kwargs={"prompt": prompt.partial(format_instructions=format_instructions)} # Perubahan sangat penting
+            return_source_documents=True,
+            combine_docs_chain_kwargs={"prompt": custom_prompt}  # Gunakan prompt yang sudah di-partial
         )
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
               try:
-                    # HANYA berikan pertanyaan.  LangChain akan mengurus sisanya.
-                    result = qa_chain.invoke({"question": prompt})
+                    result = qa_chain.invoke({"question": prompt})  # Cukup berikan pertanyaan
                     response = result["answer"]
 
-                    # --- Improved Post-processing ---
-                    parts = {}  # Dictionary to store extracted parts
+                    # --- Post-processing (same as before) ---
+                    parts = {}
 
-                    # 1. Executive Summary
                     if "Executive Summary" in response:
                         try:
                             parts["Executive Summary"] = response.split("Executive Summary")[1].split("Key Metrics")[0].strip()
                         except:
                             pass
 
-                    # 2. Key Metrics
                     if "Key Metrics" in response:
                         try:
                             table_str = response.split("Key Metrics")[1].split("Risk Analysis")[0].split("Recommendations")[0].strip()
@@ -211,57 +210,47 @@ def main():
                             header = [h.strip() for h in rows[0] if h.strip()]
                             data = [[d.strip() for d in row if d.strip()] for row in rows[1:] if any(row)]
                             if header and data:
-                                parts["Key Metrics"] = (header, data) # Store header and data separately
+                                parts["Key Metrics"] = (header, data)
                             else:
-                                parts["Key Metrics"] = table_str # Fallback: Store raw string
+                                parts["Key Metrics"] = table_str
                         except Exception as e:
                           parts["Key Metrics"] = table_str
 
-                    # 3. & 4. Risk Analysis and Recommendations
+
                     if "Risk Analysis" in response:
                          parts["Risk Analysis"] = response.split("Risk Analysis")[1].split("Recommendations")[0].strip()
                     if "Recommendations" in response:
                          parts["Recommendations"] = response.split("Recommendations")[1].strip()
 
-
-
-                    # --- Display Logic ---
                     if "Executive Summary" in parts:
-                        st.markdown(parts["Executive Summary"]) #just show it
+                        st.markdown(parts["Executive Summary"])
 
                     if "Key Metrics" in parts:
-                        if isinstance(parts["Key Metrics"], tuple): # It's (header, data)
-                            st.table(data=parts["Key Metrics"][1], header=parts["Key Metrics"][0]) #use st.table
+                        if isinstance(parts["Key Metrics"], tuple):
+                            st.table(data=parts["Key Metrics"][1], header=parts["Key Metrics"][0])
                         else:
-                            st.markdown(parts["Key Metrics"]) # Fallback: raw text
+                            st.markdown(parts["Key Metrics"])
 
                     if "Risk Analysis" in parts:
-                        st.markdown("**Risk Analysis**") # Add a heading
+                        st.markdown("**Risk Analysis**")
                         st.markdown(parts["Risk Analysis"])
 
                     if "Recommendations" in parts:
-                        st.markdown("**Recommendations**")  # Add a heading
+                        st.markdown("**Recommendations**")
                         st.markdown(parts["Recommendations"])
 
-
-                    # Fallback: Display entire response if nothing was extracted
                     if not parts:
                         st.markdown(response)
 
-
-                    # Tampilkan dokumen sumber (jika return_source_documents=True)
                     if 'source_documents' in result:
                         with st.expander("Source Documents"):
                             for doc in result['source_documents']:
                                 st.write(doc.page_content)
-                                st.write(doc.metadata) # Tampilkan metadata (nama file, dll.)
+                                st.write(doc.metadata)
                                 st.write("---")
-
-
 
               except Exception as e:
                     st.error(f"⚠️ AI Response Error: {type(e).__name__}: {str(e)}")
-
 
 # ======= 🚨 Error Handling & Safety =======
 if __name__ == "__main__":
