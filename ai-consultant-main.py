@@ -199,7 +199,11 @@ def process_file(uploaded_file, chunk_size=500, chunk_overlap=50):
         return None
 
 # ======= 🔄 Inisialisasi Chain =======
+# Inisialisasi Memori (hanya sekali)
+if 'memory' not in st.session_state:
+    st.session_state.memory = ConversationBufferMemory(return_messages=True)
 
+# Fungsi untuk Inisialisasi Chain (hanya sekali)
 def init_chain(retriever):
     """Inisialisasi ConversationalRetrievalChain"""
     template = """
@@ -230,9 +234,8 @@ def init_chain(retriever):
             memory=st.session_state.memory,
             combine_docs_chain_kwargs={"prompt": prompt},
             return_source_documents=True,
-            output_key="answer"  # Tentukan output yang ingin disimpan
+            output_key="answer"
         )
-        
         return chain
         
     except Exception as e:
@@ -240,17 +243,21 @@ def init_chain(retriever):
         st.error(f"❌ Gagal menginisialisasi chain: {str(e)}")
         return None
 
+# Fungsi untuk Memproses Kueri
 def process_query(chain, query):
     """Memproses kueri dan menangani output."""
     result = chain({"question": query})
     answer = result["answer"]
     source_docs = result["source_documents"]
 
-    # Simpan source_docs di session state untuk digunakan nanti
     st.session_state.source_docs = source_docs
 
     return answer
- 
+
+# Inisialisasi Chain (hanya sekali)
+if 'chain' not in st.session_state:
+    st.session_state.chain = init_chain(st.session_state.retriever) # st.session_state.retriever harus sudah diinisialisasi.
+
 # ======= 🔍 Proses Internet Search =======
 def search_internet(query):
     """Simulasi pencarian internet (implementasi sebenarnya membutuhkan API)"""
