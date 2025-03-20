@@ -1,7 +1,7 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationalRetrievalChain
+from langchain.chains import ConversationalRetrievalChain, LLMChain  # Import LLMChain
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
@@ -49,7 +49,10 @@ messages = [
     SystemMessagePromptTemplate.from_template(system_template),
     HumanMessagePromptTemplate.from_template(user_template)
 ]
+
+# Note: 'context' will be empty initially, then filled with document content if available.
 prompt = PromptTemplate(input_variables=["context", "question", "format_instructions"], template=system_template + "\n\n" + user_template)
+
 
 # ======= 🛠️ Document Processing Engine (no changes) =======
 class FinancialDocumentProcessor:
@@ -108,16 +111,7 @@ def transcribe_audio():
         return None
 
 # ======= 🖼️ Image Captioning Function (Hugging Face) =======
-image_captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
-
-def image_to_text(image_file):
-    try:
-        image = Image.open(image_file)
-        caption = image_captioner(image)[0]['generated_text']
-        return caption
-    except Exception as e:
-        st.error(f"Error processing image: {type(e).__name__}: {str(e)}")
-        return None
+# Moved initialization to main block
 
 # ======= 🧩 Main Application Logic =======
 def main():
@@ -128,7 +122,7 @@ def main():
         analysis_depth = st.slider("Analysis Depth", 1, 5, 3)
         st.divider()
 
-        if st.button("🧹 Clear Session"):
+        if st.button("🧹 Clear Session", key='clear_session_button'): #Added key
             st.session_state.clear()
             st.cache_resource.clear()
             st.rerun()
@@ -137,6 +131,12 @@ def main():
     models = init_models()
     llm = models[model_name]
     processor = FinancialDocumentProcessor()
+    image_captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
+
+    # Initialize a basic LLMChain for conversation *before* document processing
+    if "qa_chain" not in st.session_state:
+        initial_chain = LLMChain(llm=llm, prompt=prompt, memory=st.session_state.memory)
+        st.session_state.qa_chain = initial_chain
 
     st.title("📊 AI Financial Analyst Pro")
     st.caption("Enterprise-grade Financial Document Analysis System")
@@ -150,14 +150,14 @@ def main():
 
     # --- Image Upload ---
     uploaded_image = st.file_uploader("🖼️ Upload Image (optional)", type=["jpg", "jpeg", "png"])
+    image_caption = ""  # Initialize image_caption
     if uploaded_image:
         st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
         image_caption = image_to_text(uploaded_image)  # Generate caption
-    else:
-        image_caption = ""
 
-    # --- Document processing (no changes here) ---
-    if uploaded_files and "retriever" not in st.session_state:
+
+    # --- Document processing ---
+    if uploaded_files: # Removed  and "retriever" not in st.session_state:
         with st.status("🔍 Analyzing Documents...", expanded=True) as status:
             all_docs = []
             processed_files = []
@@ -181,46 +181,57 @@ def main():
             if all_docs:
                 with st.spinner("🧠 Building Knowledge Base..."):
                     vectorstore = FAISS.from_documents(all_docs, OpenAIEmbeddings(api_key=openai_api_key))
-                    st.session_state.retriever = vectorstore.as_retriever(
+                    retriever = vectorstore.as_retriever(
                         search_type="mmr",
                         search_kwargs={"k": 5, "fetch_k": 20}
                     )
+                    # Create the ConversationalRetrievalChain *now*
+                    qa_chain = ConversationalRetrievalChain.from_llm(
+                        llm=llm,
+                        retriever=retriever,
+                        memory=st.session_state.memory,
+                        verbose=True,
+                        return_source_documents=True,
+                        combine_docs_chain_kwargs={"prompt": prompt}
+                    )
+                    st.session_state.qa_chain = qa_chain  # Update the qa_chain
+                    st.session_state.retriever = retriever # Store the retriever
+
                 status.update(label="✅ Analysis Complete", state="complete")
                 st.success(f"Processed files: {', '.join(processed_files)}")
             else:
                 status.update(label="⚠️ No valid documents processed", state="error")
 
+
     # --- Speech-to-Text ---
     if st.button("🎤 Rekam Pertanyaan"):
         transcribed_text = transcribe_audio()
         if transcribed_text:
-            st.session_state.user_input = transcribed_text  # Simpan transkripsi
-            # st.experimental_rerun()  # Tidak perlu rerun di sini
+            st.session_state.user_input = transcribed_text  # Store transcription
 
     # --- Chat Interface ---
-    # Gunakan st.session_state untuk input pengguna
+    # Use st.session_state for user input (initialize if it doesn't exist)
     if "user_input" not in st.session_state:
         st.session_state.user_input = ""
 
-    # Tampilkan input dari transkripsi ATAU input teks
-    prompt = st.chat_input("💬 Ask financial questions...", value=st.session_state.user_input)
+    # st.chat_input *returns* the user's input.  It doesn't take a 'value' argument.
+    prompt_text = st.chat_input("💬 Ask financial questions...", placeholder="Type here or use the microphone...")
 
-    if prompt:  # Proses jika ada input (baik dari teks atau transkripsi)
-        st.session_state.user_input = prompt  # Update session state
+    if prompt_text:
+        st.session_state.user_input = prompt_text  # Update session state with the entered text
+
+    # Use a consistent variable for the user's input (either transcribed or typed)
+    user_query = st.session_state.user_input
+
+    if user_query:  # Proceed if there's *any* input
         with st.chat_message("user"):
-            st.markdown(prompt)
-
-        if "retriever" not in st.session_state:
-            st.error("Please upload documents first.")
-            st.stop()
-
-        retriever = st.session_state.retriever
+            st.markdown(user_query)
 
         # --- Dynamic Prompt ---
         format_instructions = ""
-        if "analisis risiko" in prompt.lower():
+        if "analisis risiko" in user_query.lower():
             format_instructions += "Risk Analysis: (analisis risiko secara mendalam)\n"
-        if "rekomendasi" in prompt.lower():
+        if "rekomendasi" in user_query.lower():
             format_instructions += "Recommendations: (rekomendasi yang actionable dan spesifik)\n"
         if not format_instructions:
             format_instructions = """
@@ -228,28 +239,33 @@ def main():
             Key Metrics: (dalam format tabel)
             """
 
-        custom_prompt = prompt.partial(format_instructions=format_instructions)
-
-        qa_chain = ConversationalRetrievalChain.from_llm(
-            llm=llm,
-            retriever=retriever,
-            memory=st.session_state.memory,
-            verbose=True,
-            return_source_documents=True,
-            combine_docs_chain_kwargs={"prompt": custom_prompt}
-        )
-
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    # Gabungkan input teks, transkripsi, dan caption gambar
-                    full_input = prompt
+                    # Combine text input and image caption
+                    full_input = user_query
                     if image_caption:
                         full_input += "\n\nImage Caption: " + image_caption
-                    result = qa_chain.invoke({"question": full_input})
-                    response = result["answer"]
 
-                    # --- Post-processing (same as before) ---
+                    # Use the appropriate chain (retrieval or basic)
+                    if "retriever" in st.session_state:
+                        # Retrieval chain (documents available)
+                        result = st.session_state.qa_chain.invoke({"question": full_input, "format_instructions": format_instructions})
+                        response = result["answer"]
+
+                        if 'source_documents' in result:
+                            with st.expander("Source Documents"):
+                                for doc in result['source_documents']:
+                                    st.write(doc.page_content)
+                                    st.write(doc.metadata)
+                                    st.write("---")
+                    else:
+                        # Basic LLMChain (no documents)
+                         result = st.session_state.qa_chain.invoke({"question": full_input,"context":"","format_instructions":format_instructions})
+                         response = result["text"]
+
+
+                    # --- Post-processing (same as before, but using 'response') ---
                     parts = {}
                     if "Executive Summary" in response:
                         try:
@@ -294,22 +310,13 @@ def main():
                     if not parts:
                         st.markdown(response)
 
-                    if 'source_documents' in result:
-                        with st.expander("Source Documents"):
-                            for doc in result['source_documents']:
-                                st.write(doc.page_content)
-                                st.write(doc.metadata)
-                                st.write("---")
 
                 except Exception as e:
                     st.error(f"⚠️ AI Response Error: {type(e).__name__}: {str(e)}")
 
-    # Bersihkan input jika tombol Clear Session ditekan
-    if st.session_state.get('clear_session_button'):
-      st.session_state.user_input = ""
-      st.session_state.clear()  # Bersihkan semua session state
-      st.cache_resource.clear()
-      st.rerun()
+        # Clear user_input *after* processing, so it's ready for the next turn.
+        st.session_state.user_input = ""
+
 
 # ======= 🚨 Error Handling & Safety =======
 if __name__ == "__main__":
