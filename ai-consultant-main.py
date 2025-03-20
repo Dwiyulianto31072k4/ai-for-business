@@ -231,8 +231,8 @@ def init_chain(retriever):
             retriever=retriever,
             memory=st.session_state.memory,
             combine_docs_chain_kwargs={"prompt": prompt},
-            return_source_documents=False,  # ✅ Set ke False agar hanya mengembalikan 'answer'
-            output_key="answer"  # ✅ Pastikan hanya 'answer' yang disimpan
+            return_source_documents=True,  # We need source documents
+            verbose=True
         )
 
         return chain
@@ -245,25 +245,16 @@ def init_chain(retriever):
 
 def process_query(chain, query):
     """Memproses kueri dan menangani output."""
-    result = chain({"question": query})
-    answer = result["answer"]
-    source_docs = result["source_documents"]
+    try:
+        result = chain({"question": query})
+        answer = result.get("answer", "")
+        source_docs = result.get("source_documents", [])
+        
+        return answer, source_docs
+    except Exception as e:
+        logger.error(f"Error processing query: {str(e)}")
+        return f"Error processing query: {str(e)}", []
 
-    # Simpan source_docs di session state untuk digunakan nanti
-    st.session_state.source_docs = source_docs
-
-    return answer
-
-# Fungsi untuk Memproses Kueri
-def process_query(chain, query):
-    """Memproses kueri dan menangani output."""
-    result = chain({"question": query})
-    answer = result["answer"]
-    source_docs = result["source_documents"]
-
-    st.session_state.source_docs = source_docs
-
-    return answer
 
 # Fix for line 266-268
 # Inisialisasi Chain (hanya sekali)
