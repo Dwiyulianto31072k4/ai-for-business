@@ -24,9 +24,7 @@ logger = logging.getLogger(__name__)
 # ======= 🚀 Konfigurasi Streamlit =======
 st.set_page_config(
     page_title="AI Business Consultant Pro",
-    page_icon="💼",
-    layout="wide",
-    initial_sidebar_state="expanded"
+
 )
 
 # ======= 🔒 Fungsi Keamanan =======
