@@ -22,8 +22,9 @@ openai_api_key = st.secrets["OPENAI_API_KEY"]
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# ======= 🚀 Inisialisasi Chatbot =======
-llm = ChatOpenAI(api_key=openai_api_key, model="gpt-4")
+# ======= 🔹 Pilihan Model OpenAI =======
+model_name = st.sidebar.selectbox("Pilih Model OpenAI:", ["gpt-4", "gpt-3.5-turbo"])
+llm = ChatOpenAI(api_key=openai_api_key, model=model_name)
 
 # ======= 📌 Inisialisasi Memory untuk Chat History =======
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
@@ -34,27 +35,32 @@ mode = st.radio("📌 Pilih Mode Interaksi:", ["Chat", "Upload File"], horizonta
 retriever = None  # Placeholder untuk retriever
 
 if mode == "Upload File":
-    uploaded_file = st.file_uploader("📎 Unggah file (PDF, TXT)", type=["pdf", "txt"])
-    
-    if uploaded_file:
-        with st.spinner("📖 Memproses file..."):
-            file_path = f"./temp_{uploaded_file.name}"
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+    uploaded_files = st.file_uploader("📎 Unggah file (PDF, TXT)", type=["pdf", "txt"], accept_multiple_files=True)
+    if uploaded_files:
+        all_docs = []
+        for uploaded_file in uploaded_files:
+            with st.spinner(f"📖 Memproses {uploaded_file.name}..."):
+                file_path = f"./temp_{uploaded_file.name}"
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
 
-            # Load file sesuai jenisnya
-            if uploaded_file.type == "application/pdf":
-                loader = PyPDFLoader(file_path)
-            elif uploaded_file.type == "text/plain":
-                loader = TextLoader(file_path)
+                # Load file sesuai jenisnya
+                if uploaded_file.type == "application/pdf":
+                    loader = PyPDFLoader(file_path)
+                elif uploaded_file.type == "text/plain":
+                    loader = TextLoader(file_path)
 
-            # Proses teks dan simpan ke retriever
-            documents = loader.load()
-            text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=100)
-            split_docs = text_splitter.split_documents(documents)
-            retriever = FAISS.from_documents(split_docs, OpenAIEmbeddings()).as_retriever()
+                # Proses teks dan simpan ke retriever
+                documents = loader.load()
+                text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+                split_docs = text_splitter.split_documents(documents)
+                all_docs.extend(split_docs)
 
-            st.success("✅ File berhasil diunggah dan diproses!")
+                # Hapus file sementara
+                os.remove(file_path)
+
+        retriever = FAISS.from_documents(all_docs, OpenAIEmbeddings()).as_retriever()
+        st.success("✅ File berhasil diunggah dan diproses!")
 
 # ======= 🔹 Chatbot dengan Memory & Knowledge dari File (Jika Ada) =======
 conversation = ConversationalRetrievalChain.from_llm(
@@ -70,9 +76,7 @@ for role, text in st.session_state.history:
 # ======= 🔹 Input Chat =======
 user_input = st.chat_input("✏️ Ketik pesan Anda...")
 
-if user_input:
-    user_input = user_input.strip()
-
+if user_input and user_input.strip():
     # Simpan pertanyaan user ke chat history
     st.session_state.history.append(("user", user_input))
 
@@ -89,25 +93,9 @@ if user_input:
     else:
         try:
             response_data = llm.invoke(user_input)
-
-            # ======= 🎯 PERBAIKAN MEMORY CHAT =======
-            if isinstance(response_data, str):
-                response = response_data  # Jika langsung string
-            elif hasattr(response_data, "content"):
-                response = response_data.content  # Jika objek AIMessage
-            else:
-                response = "⚠️ Tidak ada jawaban yang tersedia."
-
-            # **Tambahkan hasil AI ke memory chat**
-            memory.chat_memory.add_user_message(user_input)
-            memory.chat_memory.add_ai_message(response)
-
+            response = response_data.content if hasattr(response_data, "content") else str(response_data)
         except Exception as e:
             response = f"⚠️ Terjadi kesalahan dalam memproses pertanyaan: {str(e)}"
-
-    # 💡 Pastikan tidak ada respons kosong
-    if not response or not response.strip():
-        response = "⚠️ Terjadi kesalahan dalam mendapatkan jawaban."
 
     # Simpan respons chatbot ke chat history
     st.session_state.history.append(("assistant", response))
