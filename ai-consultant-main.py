@@ -619,6 +619,8 @@ with tab1:
                 st.markdown(response)
 
 # ======= 🎨 Custom CSS =======
+
+
 st.markdown("""
 <style>
     /* Gaya umum */
@@ -670,4 +672,14 @@ st.markdown("""
         border: 1px solid #DFE1E5 !important;
         padding: 12px !important;
         background-color: #F8F9FA !important;
-        box-shadow: 0 2px
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stChatInput:focus {
+        border-color: #4285F4 !important;
+        box-shadow: 0 0 8px rgba(66, 133, 244, 0.3) !important;
+    }
+</style>
+""")
+
