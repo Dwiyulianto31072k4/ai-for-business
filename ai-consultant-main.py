@@ -205,15 +205,15 @@ def init_chain(retriever):
     """Inisialisasi ConversationalRetrievalChain"""
     template = """
     Kamu adalah AI Business Consultant yang profesional dan membantu.
-    
+
     Konten berikut adalah informasi yang relevan yang ditemukan dari dokumen yang diunggah:
     {context}
-    
+
     Riwayat Percakapan:
     {chat_history}
-    
+
     Pertanyaan Pengguna: {question}
-    
+
     Berikan jawaban yang komprehensif, akurat, dan bermanfaat berdasarkan informasi yang diberikan.
     Jika jawaban tidak ditemukan dalam informasi yang tersedia, katakan dengan jujur bahwa
     kamu tidak dapat menjawab berdasarkan dokumen yang diunggah.
@@ -231,7 +231,7 @@ def init_chain(retriever):
             memory=st.session_state.memory,
             combine_docs_chain_kwargs={"prompt": prompt},
             return_source_documents=True,
-            output_key="answer"  # ✅ Tambahkan ini agar hanya menyimpan 'answer'
+            output_key="answer"  # ✅ Menyimpan hanya jawaban dalam memori
         )
 
         return chain
@@ -240,8 +240,6 @@ def init_chain(retriever):
         logger.error(f"Error inisialisasi chain: {str(e)}")
         st.error(f"❌ Gagal menginisialisasi chain: {str(e)}")
         return None
-
-
 
 def process_query(chain, query):
     """Memproses kueri dan menangani output."""
