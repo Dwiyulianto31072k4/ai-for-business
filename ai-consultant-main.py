@@ -88,6 +88,8 @@ def initialize_app():
         st.session_state.memory = None
     if "current_model" not in st.session_state:
         st.session_state.current_model = "gpt-4"
+    if "chain" not in st.session_state:
+        st.session_state.chain = None
 
 # ======= 🔍 Load API Key =======
 def load_api_key():
@@ -201,7 +203,6 @@ def process_file(uploaded_file, chunk_size=500, chunk_overlap=50):
         return None
 
 # ======= 🔄 Inisialisasi Chain =======
-
 def init_chain(retriever):
     """Inisialisasi ConversationalRetrievalChain"""
     template = """
@@ -242,29 +243,6 @@ def init_chain(retriever):
         st.error(f"❌ Gagal menginisialisasi chain: {str(e)}")
         return None
 
-
-def process_query(chain, query):
-    """Memproses kueri dan menangani output."""
-    try:
-        result = chain({"question": query})
-        answer = result.get("answer", "")
-        source_docs = result.get("source_documents", [])
-        
-        return answer, source_docs
-    except Exception as e:
-        logger.error(f"Error processing query: {str(e)}")
-        return f"Error processing query: {str(e)}", []
-
-
-# Fix for line 266-268
-# Inisialisasi Chain (hanya sekali)
-if 'chain' not in st.session_state:
-    if 'retriever' in st.session_state and st.session_state.retriever is not None:
-        st.session_state.chain = init_chain(st.session_state.retriever)
-    else:
-        st.session_state.chain = None
-
-
 # ======= 🔍 Proses Internet Search =======
 def search_internet(query):
     """Simulasi pencarian internet (implementasi sebenarnya membutuhkan API)"""
@@ -277,6 +255,57 @@ def search_internet(query):
            "1. Hasil pencarian yang relevan akan ditampilkan di sini.\n" + \
            "2. Informasi tambahan dari pencarian web akan diintergrasikan.\n" + \
            "3. Pencarian khusus untuk informasi bisnis akan diprioritaskan."
+
+def process_query(query):
+    """Memproses kueri dan menangani output."""
+    try:
+        # Deteksi jika ada permintaan pencarian web
+        if "cari di internet" in query.lower() or "search online" in query.lower():
+            return search_internet(query), []
+        
+        # Jika ada file yang diproses, gunakan ConversationalRetrievalChain
+        if st.session_state.file_processed and st.session_state.conversation:
+            with get_openai_callback() as cb:
+                result = st.session_state.conversation({"question": query})
+                
+                # Update token usage
+                st.session_state.token_usage["prompt_tokens"] += cb.prompt_tokens
+                st.session_state.token_usage["completion_tokens"] += cb.completion_tokens
+                st.session_state.token_usage["total_tokens"] += cb.total_tokens
+                
+                response = result["answer"]
+                source_docs = result.get("source_documents", [])
+                
+                # Tambahkan informasi sumber
+                if source_docs:
+                    sources = set()
+                    for doc in source_docs:
+                        if hasattr(doc, "metadata") and "source" in doc.metadata:
+                            sources.add(doc.metadata["source"])
+                    
+                    if sources:
+                        response += "\n\n**Sumber:**\n"
+                        for source in sources:
+                            response += f"- {source}\n"
+                
+                return response, source_docs
+        # Jika tidak ada file, gunakan LLM langsung
+        else:
+            with get_openai_callback() as cb:
+                result = st.session_state.llm.invoke(
+                    f"Kamu adalah AI Business Consultant yang profesional. Jawab pertanyaan berikut: {query}"
+                )
+                
+                # Update token usage
+                st.session_state.token_usage["prompt_tokens"] += cb.prompt_tokens
+                st.session_state.token_usage["completion_tokens"] += cb.completion_tokens
+                st.session_state.token_usage["total_tokens"] += cb.total_tokens
+                
+                return result.content, []
+                
+    except Exception as e:
+        logger.error(f"Error saat memproses pertanyaan: {str(e)}")
+        return f"⚠️ Terjadi kesalahan: {str(e)}", []
 
 # ======= 🚀 Inisialisasi Aplikasi =======
 initialize_app()
@@ -378,6 +407,7 @@ with tab2:
         
         if st.session_state.retriever:
             st.session_state.file_processed = True
+            # Initialize conversation chain
             st.session_state.conversation = init_chain(st.session_state.retriever)
             st.success("✅ File berhasil diproses dan siap digunakan!")
     
@@ -420,8 +450,7 @@ with tab1:
         chat_input_disabled = False
     
     # Chat input
-    user_input = st.text_input("✏️ Ketik pesan Anda...", disabled=chat_input_disabled)
-
+    user_input = st.chat_input("✏️ Ketik pesan Anda...", disabled=chat_input_disabled)
     
     if user_input:
         # Tampilkan pesan user
@@ -433,61 +462,14 @@ with tab1:
         
         # Proses pertanyaan
         with st.spinner("AI sedang berpikir..."):
-            try:
-                # Deteksi jika ada permintaan pencarian web
-                if "cari di internet" in user_input.lower() or "search online" in user_input.lower():
-                    response = search_internet(user_input)
-
-        if st.session_state.file_processed and st.session_state.conversation:
-    with get_openai_callback() as cb:
-        result = st.session_state.conversation({"question": user_input})
-                
-                # Jika ada file yang diproses, gunakan ConversationalRetrievalChain
-        
-              
-        response = result["answer"]
-        
-        # Update token usage
-        st.session_state.token_usage["prompt_tokens"] += cb.prompt_tokens
-        st.session_state.token_usage["completion_tokens"] += cb.completion_tokens
-        st.session_state.token_usage["total_tokens"] += cb.total_tokens
-        
-        # Tambahkan informasi sumber
-        if "source_documents" in result and result["source_documents"]:
-            sources = set()
-            for doc in result["source_documents"]:
-                if hasattr(doc, "metadata") and "source" in doc.metadata:
-                    sources.add(doc.metadata["source"])
+            response, source_docs = process_query(user_input)
             
-            if sources:
-    response += "\n\n**Sumber:**\n"
-    for source in sources:
-        response += f"- {source}\n"
-        # Jika tidak ada file, gunakan LLM langsung
-        else:
-            with get_openai_callback() as cb:
-        result = st.session_state.llm.invoke(
-            f"Kamu adalah AI Business Consultant yang profesional. Jawab pertanyaan berikut: {user_input}"
-        )               
-                        response = result.content
-                        
-                        # Update token usage
-                        st.session_state.token_usage["prompt_tokens"] += cb.prompt_tokens
-                        st.session_state.token_usage["completion_tokens"] += cb.completion_tokens
-                        st.session_state.token_usage["total_tokens"] += cb.total_tokens
-                
-                # Tambahkan respons ke history
-                st.session_state.history.append(("assistant", response))
-                
-                # Tampilkan respons
-                with st.chat_message("assistant"):
-                    st.write(response)
-                    
-            except Exception as e:
-                logger.error(f"Error saat memproses pertanyaan: {str(e)}")
-                error_message = f"⚠️ Terjadi kesalahan: {str(e)}"
-                st.error(error_message)
-                st.session_state.history.append(("assistant", error_message))
+            # Tambahkan respons ke history
+            st.session_state.history.append(("assistant", response))
+            
+            # Tampilkan respons
+            with st.chat_message("assistant"):
+                st.write(response)
 
 # ======= 🎨 Custom CSS =======
 st.markdown("""
