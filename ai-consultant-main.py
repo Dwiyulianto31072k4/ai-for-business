@@ -285,7 +285,7 @@ initialize_app()
 
 # ======= 📊 Sidebar =======
 with st.sidebar:
-    st.image("https://www.svgrepo.com/show/373328/ai.svg", width=100)
+    st.image("gambarkonsultan.jpg", width=100)
     st.title("💼 AI Business Consultant")
     
     # Load API Key
