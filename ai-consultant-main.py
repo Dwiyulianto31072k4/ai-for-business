@@ -583,6 +583,7 @@ with tab1:
     chat_container = st.container()
     
     # Tampilkan chat history
+    # Tampilkan chat history
     with chat_container:
     for i, (role, message) in enumerate(st.session_state.history):
         # Gunakan st.chat_message tanpa key
