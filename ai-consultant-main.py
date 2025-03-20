@@ -230,8 +230,8 @@ def init_chain(retriever):
             retriever=retriever,
             memory=st.session_state.memory,
             combine_docs_chain_kwargs={"prompt": prompt},
-            return_source_documents=True,
-            output_key="answer"  # ✅ Menyimpan hanya jawaban dalam memori
+            return_source_documents=False,  # ✅ Set ke False agar hanya mengembalikan 'answer'
+            output_key="answer"  # ✅ Pastikan hanya 'answer' yang disimpan
         )
 
         return chain
@@ -240,6 +240,7 @@ def init_chain(retriever):
         logger.error(f"Error inisialisasi chain: {str(e)}")
         st.error(f"❌ Gagal menginisialisasi chain: {str(e)}")
         return None
+
 
 def process_query(chain, query):
     """Memproses kueri dan menangani output."""
