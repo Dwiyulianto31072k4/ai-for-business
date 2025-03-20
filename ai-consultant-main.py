@@ -170,19 +170,28 @@ def main():
         )
 
         # Generate Response
-        with st.chat_message("assistant"):
-            try:
-                response = llm.invoke(formatted_prompt)
-                content = response.content
-                
-                # Enhanced Formatting
-                content = re.sub(r"\*\*(.*?)\*\*", r"**\1**", content)  # Bold formatting
-                content = re.sub(r"(\d+\.)\s", r"\n\\1 ", content)       # List formatting
-                
-                st.markdown(content)
-                st.session_state.memory.add_context(f"Q: {prompt}\nA: {content}")
-            except Exception as e:
-                st.error(f"⚠️ AI Response Error: {str(e)}")
+    # Generate Response
+with st.chat_message("assistant"):
+    try:
+        # Invoke the model response
+        response = llm.invoke(formatted_prompt)
+        content = response.content
+        
+        # Enhanced Formatting for bold, list, and headings
+        content = re.sub(r"\*\*(.*?)\*\*", r"**\1**", content)  # Bold formatting
+        content = re.sub(r"(\d+)\.\s", r"\n\1. ", content)       # List formatting for ordered lists
+
+        # Display formatted content in markdown
+        st.markdown(content)
+
+        # Save to session memory
+        st.session_state.memory.add_context(f"Q: {prompt}\nA: {content}")
+        
+    except Exception as e:
+        st.error(f"⚠️ AI Response Error: {str(e)}")
+Penjelasan perbaikan kode:
+
+
 
 # ======= 🚨 Error Handling & Safety =======
 if __name__ == "__main__":
