@@ -258,8 +258,12 @@ def process_query(chain, query):
 
 # Fix for line 266-268
 # Inisialisasi Chain (hanya sekali)
-if 'chain' not in st.session_state and 'retriever' in st.session_state and st.session_state.retriever is not None:
-    st.session_state.chain = init_chain(st.session_state.retriever)
+if 'chain' not in st.session_state:
+    if 'retriever' in st.session_state and st.session_state.retriever is not None:
+        st.session_state.chain = init_chain(st.session_state.retriever)
+    else:
+        st.session_state.chain = None
+
 
 # ======= 🔍 Proses Internet Search =======
 def search_internet(query):
@@ -416,10 +420,8 @@ with tab1:
         chat_input_disabled = False
     
     # Chat input
-    user_input = st.chat_input(
-        "✏️ Ketik pesan Anda...", 
-        disabled=chat_input_disabled
-    )
+    user_input = st.text_input("✏️ Ketik pesan Anda...", disabled=chat_input_disabled)
+
     
     if user_input:
         # Tampilkan pesan user
@@ -435,13 +437,13 @@ with tab1:
                 # Deteksi jika ada permintaan pencarian web
                 if "cari di internet" in user_input.lower() or "search online" in user_input.lower():
                     response = search_internet(user_input)
+
+        if st.session_state.file_processed and st.session_state.conversation:
+    with get_openai_callback() as cb:
+        result = st.session_state.conversation({"question": user_input})
                 
                 # Jika ada file yang diproses, gunakan ConversationalRetrievalChain
-          elif st.session_state.file_processed and st.session_state.conversation:
-          with get_openai_callback() as cb:
-        result = st.session_state.conversation.invoke({
-            "question": user_input
-        })
+        
               
         response = result["answer"]
         
@@ -458,16 +460,17 @@ with tab1:
                     sources.add(doc.metadata["source"])
             
             if sources:
-                response += "\n\n**Sumber:**\n"
-                for source in sources:
-                    response += f"- {source}\n"
-                
-                # Jika tidak ada file, gunakan LLM langsung
-                else:
-                    with get_openai_callback() as cb:
-                        result = st.session_state.llm.invoke(
-                            f"Kamu adalah AI Business Consultant yang profesional. Jawab pertanyaan berikut: {user_input}"
-                        )
+    response += "\n\n**Sumber:**\n"
+    for source in sources:
+        response += f"- {source}\n"
+
+# Jika tidak ada file, gunakan LLM langsung
+else:
+    with get_openai_callback() as cb:
+        result = st.session_state.llm.invoke(
+            f"Kamu adalah AI Business Consultant yang profesional. Jawab pertanyaan berikut: {user_input}"
+        )
+
                         
                         response = result.content
                         
