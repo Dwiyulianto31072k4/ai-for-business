@@ -463,15 +463,12 @@ with tab1:
     response += "\n\n**Sumber:**\n"
     for source in sources:
         response += f"- {source}\n"
-
-# Jika tidak ada file, gunakan LLM langsung
-else:
-    with get_openai_callback() as cb:
+        # Jika tidak ada file, gunakan LLM langsung
+        else:
+            with get_openai_callback() as cb:
         result = st.session_state.llm.invoke(
             f"Kamu adalah AI Business Consultant yang profesional. Jawab pertanyaan berikut: {user_input}"
-        )
-
-                        
+        )               
                         response = result.content
                         
                         # Update token usage
