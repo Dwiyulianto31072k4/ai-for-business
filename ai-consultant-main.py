@@ -224,14 +224,15 @@ def init_chain(retriever):
     )
     
     try:
-   chain = ConversationalRetrievalChain.from_llm(
+        chain = ConversationalRetrievalChain.from_llm(
     llm=st.session_state.llm,
     retriever=retriever,
     memory=st.session_state.memory,
     combine_docs_chain_kwargs={"prompt": prompt},
     return_source_documents=True,
     output_key="answer"  # Tentukan output yang ingin disimpan
-)
+        )
+        
         return chain
     except Exception as e:
         logger.error(f"Error inisialisasi chain: {str(e)}")
