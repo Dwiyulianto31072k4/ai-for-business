@@ -84,6 +84,8 @@ def initialize_app():
         st.session_state.llm = None
     if "memory" not in st.session_state:
         st.session_state.memory = None
+    if "current_model" not in st.session_state:
+        st.session_state.current_model = "gpt-4"
 
 # ======= 🔍 Load API Key =======
 def load_api_key():
@@ -104,10 +106,12 @@ def init_llm(api_key, model_name, temperature=0.7, max_tokens=500):
     try:
         llm = ChatOpenAI(
             api_key=api_key,
-            model=model_name,
+            model_name=model_name,  # Menggunakan model_name bukan model
             temperature=temperature,
             max_tokens=max_tokens
         )
+        # Simpan model yang sedang digunakan dalam state
+        st.session_state.current_model = model_name
         return llm
     except Exception as e:
         logger.error(f"Error inisialisasi LLM: {str(e)}")
@@ -266,7 +270,8 @@ with st.sidebar:
     selected_model = st.selectbox(
         "🤖 Pilih Model:",
         options=list(model_options.keys()),
-        format_func=lambda x: model_options[x]
+        format_func=lambda x: model_options[x],
+        index=list(model_options.keys()).index(st.session_state.current_model)
     )
     
     # Advanced Settings
@@ -278,7 +283,7 @@ with st.sidebar:
     
     # Initialize LLM if API key is available
     if st.session_state.api_key and (st.session_state.llm is None or 
-                                       st.session_state.llm.model != selected_model):
+                                    selected_model != st.session_state.current_model):
         st.session_state.llm = init_llm(
             st.session_state.api_key,
             selected_model,
