@@ -263,9 +263,10 @@ def process_query(chain, query):
 
     return answer
 
+# Fix for line 266-268
 # Inisialisasi Chain (hanya sekali)
-if 'chain' not in st.session_state:
-    st.session_state.chain = init_chain(st.session_state.retriever) # st.session_state.retriever harus sudah diinisialisasi.
+if 'chain' not in st.session_state and 'retriever' in st.session_state and st.session_state.retriever is not None:
+    st.session_state.chain = init_chain(st.session_state.retriever)
 
 # ======= 🔍 Proses Internet Search =======
 def search_internet(query):
