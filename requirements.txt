@@ -1,3 +1,4 @@
+# Core dependencies
 streamlit
 openai
 langchain
@@ -5,20 +6,48 @@ langchain_openai
 langchain_community
 faiss-cpu
 tiktoken
-beautifulsoup4
-requests
-PyMuPDF
 pydantic
 pypdf
-streamlit
-langchain
-langchain-openai
-faiss-cpu
 PyPDF2
 python-dotenv
-speechrecognition
+
+# For file processing
+PyMuPDF
+pandas
+
+# For visualization
+matplotlib
+plotly
+seaborn
+
+# For forecasting
+prophet
+statsmodels
+scikit-learn
+
+# For web search
+requests
+beautifulsoup4
+
+# For speech
+SpeechRecognition
+
+# For multiple API providers
+langchain-anthropic
+anthropic
+langchain-groq
+groq
+langchain-huggingface-hub
+
+# For image processing
 Pillow
+
+# For NLP tasks
 transformers
 torch
 torchvision
 torchaudio
+
+# For logging
+logging
+
