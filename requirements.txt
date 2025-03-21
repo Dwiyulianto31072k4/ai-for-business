@@ -1,4 +1,3 @@
-# Core dependencies
 streamlit
 openai
 langchain
@@ -10,44 +9,26 @@ pydantic
 pypdf
 PyPDF2
 python-dotenv
-
-# For file processing
 PyMuPDF
 pandas
-
-# For visualization
 matplotlib
 plotly
 seaborn
-
-# For forecasting
 prophet
 statsmodels
 scikit-learn
-
-# For web search
 requests
 beautifulsoup4
-
-# For speech
 SpeechRecognition
-
-# For multiple API providers
 langchain-anthropic
 anthropic
 langchain-groq
 groq
 langchain-huggingface-hub
-
-# For image processing
 Pillow
-
-# For NLP tasks
 transformers
 torch
 torchvision
 torchaudio
-
-# For logging
 logging
 
